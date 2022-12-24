@@ -31,101 +31,101 @@
  * return value		- The address which the symbol_name will be loaded to, if the symbol was found and is global.
  */
 
-Elf64_Shdr *getStringTableHeader(int fd, Elf64_Ehdr *elf_header, Elf64_Shdr *section_header, int *section_string_index);
+// Elf64_Shdr *getStringTableHeader(int fd, Elf64_Ehdr *elf_header, Elf64_Shdr *section_header, int *section_string_index);
 
-Elf64_Shdr *getSymbolTableHeader(int fd, Elf64_Ehdr *elf_headerm, Elf64_Shdr *section_header);
+// Elf64_Shdr *getSymbolTableHeader(int fd, Elf64_Ehdr *elf_headerm, Elf64_Shdr *section_header);
 
-unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val)
-{
-	// TODO: Implement.
-	if (!symbol_name || !exe_file_name)
-	{
-		*error_val = -ET_REL;
-		return 1;
-	}
-	int fd = open(exe_file_name, O_RDONLY);
-	if (fd < 0)
-	{
-		*error_val = -ET_DYN;
-		return 1;
-	}
-	Elf64_Ehdr elf_header;
-	if (read(fd, &elf_header, sizeof(elf_header)) != sizeof(elf_header))
-	{
-		*error_val = -ET_DYN;
-		return 1;
-	}
-	if (elf_header.e_type != ET_EXEC)
-	{
-		*error_val = -ET_DYN;
-		return 1;
-	}
-	Elf64_Shdr *section_header = malloc(elf_header.e_shentsize * elf_header.e_shnum);
-	if (!section_header)
-	{
-		*error_val = -ET_DYN;
-		return 1;
-	}
-	if (lseek(fd, elf_header.e_shoff, SEEK_SET) < 0)
-	{
-		*error_val = -ET_DYN;
-		return 1;
-	}
-	if (read(fd, section_header, elf_header.e_shentsize * elf_header.e_shnum) != elf_header.e_shentsize * elf_header.e_shnum)
-	{
-		*error_val = -ET_DYN;
-		return 1;
-	}
-	Elf64_Shdr section_header_string_table = section_header[elf_header.e_shstrndx];
-	int section_string_index = 0;
-	Elf64_Shdr *string_table_header = getStringTableHeader(fd, &elf_header, section_header, &section_string_index);
-	if (!string_table_header)
-	{
-		*error_val = -ET_DYN;
-		return 1;
-	}
-	Elf64_Shdr *symbol_table_header = getSymbolTableHeader(fd, &elf_header, section_header);
-	if (!symbol_table_header)
-	{
-		*error_val = -ET_DYN;
-		return 1;
-	}
-	int symtab_entries_num = symbol_table_header->sh_size / symbol_table_header->sh_entsize;
-	for (int i = 0; i < symtab_entries_num; i++)
-	{
-	}
+// unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val)
+// {
+// 	// TODO: Implement.
+// 	if (!symbol_name || !exe_file_name)
+// 	{
+// 		*error_val = -ET_REL;
+// 		return 1;
+// 	}
+// 	int fd = open(exe_file_name, O_RDONLY);
+// 	if (fd < 0)
+// 	{
+// 		*error_val = -ET_DYN;
+// 		return 1;
+// 	}
+// 	Elf64_Ehdr elf_header;
+// 	if (read(fd, &elf_header, sizeof(elf_header)) != sizeof(elf_header))
+// 	{
+// 		*error_val = -ET_DYN;
+// 		return 1;
+// 	}
+// 	if (elf_header.e_type != ET_EXEC)
+// 	{
+// 		*error_val = -ET_DYN;
+// 		return 1;
+// 	}
+// 	Elf64_Shdr *section_header = malloc(elf_header.e_shentsize * elf_header.e_shnum);
+// 	if (!section_header)
+// 	{
+// 		*error_val = -ET_DYN;
+// 		return 1;
+// 	}
+// 	if (lseek(fd, elf_header.e_shoff, SEEK_SET) < 0)
+// 	{
+// 		*error_val = -ET_DYN;
+// 		return 1;
+// 	}
+// 	if (read(fd, section_header, elf_header.e_shentsize * elf_header.e_shnum) != elf_header.e_shentsize * elf_header.e_shnum)
+// 	{
+// 		*error_val = -ET_DYN;
+// 		return 1;
+// 	}
+// 	Elf64_Shdr section_header_string_table = section_header[elf_header.e_shstrndx];
+// 	int section_string_index = 0;
+// 	Elf64_Shdr *string_table_header = getStringTableHeader(fd, &elf_header, section_header, &section_string_index);
+// 	if (!string_table_header)
+// 	{
+// 		*error_val = -ET_DYN;
+// 		return 1;
+// 	}
+// 	Elf64_Shdr *symbol_table_header = getSymbolTableHeader(fd, &elf_header, section_header);
+// 	if (!symbol_table_header)
+// 	{
+// 		*error_val = -ET_DYN;
+// 		return 1;
+// 	}
+// 	int symtab_entries_num = symbol_table_header->sh_size / symbol_table_header->sh_entsize;
+// 	for (int i = 0; i < symtab_entries_num; i++)
+// 	{
+// 	}
 
-	free(section_header);
-	close(fd);
-	return 0;
-}
+// 	free(section_header);
+// 	close(fd);
+// 	return 0;
+// }
 
-Elf64_Shdr *getStringTableHeader(int fd, Elf64_Ehdr *elf_header, Elf64_Shdr *section_header, int *section_string_index)
-{
-	Elf64_Shdr section_header_string_table = section_header[elf_header->e_shstrndx];
-	char *section_string_table = malloc(section_header_string_table.sh_size);
-	if (!section_string_table)
-	{
-		return NULL;
-	}
-	if (lseek(fd, section_header_string_table.sh_offset, SEEK_SET) < 0)
-	{
-		return NULL;
-	}
-	if (read(fd, section_string_table, section_header_string_table.sh_size) != section_header_string_table.sh_size)
-	{
-		return NULL;
-	}
-	for (int i = 0; i < elf_header->e_shnum; i++)
-	{
-		if (strcmp(section_string_table + section_header[i].sh_name, ".strtab") == 0)
-		{
-			*section_string_index = i;
-			return &section_header[i];
-		}
-	}
-	return NULL;
-}
+// Elf64_Shdr *getStringTableHeader(int fd, Elf64_Ehdr *elf_header, Elf64_Shdr *section_header, int *section_string_index)
+// {
+// 	Elf64_Shdr section_header_string_table = section_header[elf_header->e_shstrndx];
+// 	char *section_string_table = malloc(section_header_string_table.sh_size);
+// 	if (!section_string_table)
+// 	{
+// 		return NULL;
+// 	}
+// 	if (lseek(fd, section_header_string_table.sh_offset, SEEK_SET) < 0)
+// 	{
+// 		return NULL;
+// 	}
+// 	if (read(fd, section_string_table, section_header_string_table.sh_size) != section_header_string_table.sh_size)
+// 	{
+// 		return NULL;
+// 	}
+// 	for (int i = 0; i < elf_header->e_shnum; i++)
+// 	{
+// 		if (strcmp(section_string_table + section_header[i].sh_name, ".strtab") == 0)
+// 		{
+// 			*section_string_index = i;
+// 			return &section_header[i];
+// 		}
+// 	}
+// 	return NULL;
+// }
 
 // TODO: psodo
 /*
@@ -148,6 +148,93 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 			Check st_info field of the symbol
 			if st_info is global, return the symbol offset
 */
+#define SHT_STRTAB 3
+#define SHT_SYMTAB 2
+
+#define STB_GLOBAL 1
+
+int getIndex(Elf64_Shdr *section_header_string_table, int type, int num_of_sections);
+
+unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val)
+{
+	if (!symbol_name || !exe_file_name)
+	{
+		*error_val = -1;
+		return 1;
+	}
+	int fd = open(exe_file_name, O_RDONLY);
+	Elf64_Ehdr elf_header;
+	read(fd, &elf_header, sizeof(elf_header));
+	if (elf_header.e_type != ET_EXEC)
+	{
+		close(fd);
+		*error_val = -3;
+		return 1;
+	}
+	Elf64_Shdr *section_header = malloc(elf_header.e_shentsize * elf_header.e_shnum);
+	lseek(fd, elf_header.e_shoff, SEEK_SET);
+	read(fd, section_header, elf_header.e_shentsize * elf_header.e_shnum);
+
+	Elf64_Shdr *section_header_string_table = malloc(elf_header.e_shentsize * elf_header.e_shnum);
+
+	int symtab_index = getIndex(section_header_string_table, SHT_SYMTAB, elf_header.e_shnum);
+	Elf64_Shdr symbol_table_header = section_header[symtab_index];
+	char *symbol_table = (char *)malloc(symbol_table_header.sh_size);
+	lseek(fd, symbol_table_header.sh_offset, SEEK_SET);
+	read(fd, symbol_table, symbol_table_header.sh_size);
+
+	int strtab_index = getIndex(section_header_string_table, SHT_STRTAB, elf_header.e_shnum);
+	Elf64_Shdr string_table_header = section_header[strtab_index];
+	char *string_table = (char *)malloc(string_table_header.sh_size);
+	lseek(fd, string_table_header.sh_offset, SEEK_SET);
+	read(fd, string_table, string_table_header.sh_size);
+
+	int num_of_symbols = symbol_table_header.sh_size / symbol_table_header.sh_entsize;
+
+	for (int i = 0; i < num_of_symbols; ++i)
+	{
+		Elf64_Sym *symbol = (Elf64_Sym *)(symbol_table + i * symbol_table_header.sh_entsize);
+		char *symbol_name = string_table + symbol->st_name;
+		if (strcmp(symbol_name, symbol_name) == 0)
+		{
+			if (ELF64_ST_BIND(symbol->st_info) == STB_GLOBAL)
+			{
+				free(section_header_string_table);
+				free(string_table);
+				free(symbol_table);
+				close(fd);
+				*error_val = 0;
+				return symbol->st_value;
+			}
+			else
+			{
+				free(section_header_string_table);
+				free(string_table);
+				free(symbol_table);
+				close(fd);
+				*error_val = -2;
+				return 1;
+			}
+		}
+	}
+
+	*error_val = -1;
+	free(section_header_string_table);
+	free(string_table);
+	free(symbol_table);
+	close(fd);
+	return 1;
+}
+
+int getIndex(Elf64_Shdr *section_header_string_table, int type, int num_of_sections)
+{
+	int i = 0;
+	while (section_header_string_table[i].sh_type != type && i < num_of_sections)
+	{
+		i++;
+	}
+	return i;
+}
 
 int main(int argc, char *const argv[])
 {
