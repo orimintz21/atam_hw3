@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/orimintz21/atam/hw3/hw3_students_file/build",
+  "command": "/usr/bin/gcc   -g -o CMakeFiles/myprogram.dir/hw3_part1.c.o -c /home/orimintz21/atam/hw3/hw3_students_file/part1/hw3_part1.c",
+  "file": "/home/orimintz21/atam/hw3/hw3_students_file/part1/hw3_part1.c"
+}
+]

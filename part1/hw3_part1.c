@@ -20,6 +20,7 @@
 #define ET_EXEC 2 // Executable file
 #define ET_DYN 3  // Shared object file
 #define ET_CORE 4 // Core file
+#define SHF_EXECINSTR 0x4
 
 /* symbol_name		- The symbol (maybe function) we need to search for.
  * exe_file_name	- The file where we search the symbol in.
@@ -30,102 +31,6 @@
  * 			- If -4: The symbol was found, it is global, but it is not defined in the executable.
  * return value		- The address which the symbol_name will be loaded to, if the symbol was found and is global.
  */
-
-// Elf64_Shdr *getStringTableHeader(int fd, Elf64_Ehdr *elf_header, Elf64_Shdr *section_header, int *section_string_index);
-
-// Elf64_Shdr *getSymbolTableHeader(int fd, Elf64_Ehdr *elf_headerm, Elf64_Shdr *section_header);
-
-// unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val)
-// {
-// 	// TODO: Implement.
-// 	if (!symbol_name || !exe_file_name)
-// 	{
-// 		*error_val = -ET_REL;
-// 		return 1;
-// 	}
-// 	int fd = open(exe_file_name, O_RDONLY);
-// 	if (fd < 0)
-// 	{
-// 		*error_val = -ET_DYN;
-// 		return 1;
-// 	}
-// 	Elf64_Ehdr elf_header;
-// 	if (read(fd, &elf_header, sizeof(elf_header)) != sizeof(elf_header))
-// 	{
-// 		*error_val = -ET_DYN;
-// 		return 1;
-// 	}
-// 	if (elf_header.e_type != ET_EXEC)
-// 	{
-// 		*error_val = -ET_DYN;
-// 		return 1;
-// 	}
-// 	Elf64_Shdr *section_header = malloc(elf_header.e_shentsize * elf_header.e_shnum);
-// 	if (!section_header)
-// 	{
-// 		*error_val = -ET_DYN;
-// 		return 1;
-// 	}
-// 	if (lseek(fd, elf_header.e_shoff, SEEK_SET) < 0)
-// 	{
-// 		*error_val = -ET_DYN;
-// 		return 1;
-// 	}
-// 	if (read(fd, section_header, elf_header.e_shentsize * elf_header.e_shnum) != elf_header.e_shentsize * elf_header.e_shnum)
-// 	{
-// 		*error_val = -ET_DYN;
-// 		return 1;
-// 	}
-// 	Elf64_Shdr section_header_string_table = section_header[elf_header.e_shstrndx];
-// 	int section_string_index = 0;
-// 	Elf64_Shdr *string_table_header = getStringTableHeader(fd, &elf_header, section_header, &section_string_index);
-// 	if (!string_table_header)
-// 	{
-// 		*error_val = -ET_DYN;
-// 		return 1;
-// 	}
-// 	Elf64_Shdr *symbol_table_header = getSymbolTableHeader(fd, &elf_header, section_header);
-// 	if (!symbol_table_header)
-// 	{
-// 		*error_val = -ET_DYN;
-// 		return 1;
-// 	}
-// 	int symtab_entries_num = symbol_table_header->sh_size / symbol_table_header->sh_entsize;
-// 	for (int i = 0; i < symtab_entries_num; i++)
-// 	{
-// 	}
-
-// 	free(section_header);
-// 	close(fd);
-// 	return 0;
-// }
-
-// Elf64_Shdr *getStringTableHeader(int fd, Elf64_Ehdr *elf_header, Elf64_Shdr *section_header, int *section_string_index)
-// {
-// 	Elf64_Shdr section_header_string_table = section_header[elf_header->e_shstrndx];
-// 	char *section_string_table = malloc(section_header_string_table.sh_size);
-// 	if (!section_string_table)
-// 	{
-// 		return NULL;
-// 	}
-// 	if (lseek(fd, section_header_string_table.sh_offset, SEEK_SET) < 0)
-// 	{
-// 		return NULL;
-// 	}
-// 	if (read(fd, section_string_table, section_header_string_table.sh_size) != section_header_string_table.sh_size)
-// 	{
-// 		return NULL;
-// 	}
-// 	for (int i = 0; i < elf_header->e_shnum; i++)
-// 	{
-// 		if (strcmp(section_string_table + section_header[i].sh_name, ".strtab") == 0)
-// 		{
-// 			*section_string_index = i;
-// 			return &section_header[i];
-// 		}
-// 	}
-// 	return NULL;
-// }
 
 // TODO: psodo
 /*
@@ -150,106 +55,200 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 */
 #define SHT_STRTAB 3
 #define SHT_SYMTAB 2
-
+#define PT_LOAD 1
 #define STB_GLOBAL 1
 
-int getIndex(Elf64_Shdr *section_header_string_table, int type, int num_of_sections);
+int getIndex(Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table, char *section_name);
+Elf64_Shdr *getSectionHeader(int fd, Elf64_Ehdr *elf_header);
+char *getSymbolTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table);
+char *getStringTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table);
+char *getSectionHeaderStringTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header);
+Elf64_Phdr *getProgramHeader(int fd, Elf64_Ehdr *elf_header);
+Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *symbol_table, char *symbol_name);
+
+void freeAllAndClose(int fd, char *section_header_string_table, char *symbol_table, char *string_table, Elf64_Phdr *program_header);
 
 unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val)
 {
 	if (!symbol_name || !exe_file_name)
 	{
 		*error_val = -1;
-		return 1;
+		return 0;
 	}
+	// printf("symbol_name: %s, exe_file_name: %s\n", symbol_name, exe_file_name);
 	int fd = open(exe_file_name, O_RDONLY);
+	if (fd < 0)
+	{
+		*error_val = -3;
+		return 0;
+	}
 	Elf64_Ehdr elf_header;
 	read(fd, &elf_header, sizeof(elf_header));
 	if (elf_header.e_type != ET_EXEC)
 	{
 		close(fd);
 		*error_val = -3;
-		return 1;
+		return 0;
 	}
-	Elf64_Shdr *section_header = malloc(elf_header.e_shentsize * elf_header.e_shnum);
-	lseek(fd, elf_header.e_shoff, SEEK_SET);
-	read(fd, section_header, elf_header.e_shentsize * elf_header.e_shnum);
 
-	Elf64_Shdr *section_header_string_table = malloc(elf_header.e_shentsize * elf_header.e_shnum);
+	Elf64_Shdr *section_header = getSectionHeader(fd, &elf_header);
 
-	int symtab_index = getIndex(section_header_string_table, SHT_SYMTAB, elf_header.e_shnum);
+	char *section_header_string_table = getSectionHeaderStringTable(fd, section_header, &elf_header);
+
+	char *symbol_table = getSymbolTable(fd, section_header, &elf_header, section_header_string_table);
+
+	char *string_table = getStringTable(fd, section_header, &elf_header, section_header_string_table);
+
+	int symtab_index = getIndex(section_header, &elf_header, section_header_string_table, ".symtab");
+	Elf64_Shdr symbol_table_header = section_header[symtab_index];
+	int num_of_symbols = symbol_table_header.sh_size / symbol_table_header.sh_entsize;
+	Elf64_Sym *symbol = getSymbol(&symbol_table_header, string_table, symbol_table, symbol_name);
+	if (!symbol)
+	{
+		*error_val = -1;
+		freeAllAndClose(fd, section_header_string_table, symbol_table, string_table, NULL);
+		return 0;
+	}
+	if (symbol->st_shndx != STB_GLOBAL)
+	{
+		*error_val = -2;
+		freeAllAndClose(fd, section_header_string_table, symbol_table, string_table, NULL);
+		return 0;
+	}
+	Elf64_Phdr *program_header = getProgramHeader(fd, &elf_header);
+	for (int i = 0; i < elf_header.e_phnum; i++)
+	{
+		if (program_header[i].p_flags == SHF_EXECINSTR)
+		{
+			if (symbol->st_value >= program_header[i].p_vaddr && symbol->st_value < program_header[i].p_vaddr + program_header[i].p_memsz)
+			{
+				*error_val = 1;
+				freeAllAndClose(fd, section_header_string_table, symbol_table, string_table, program_header);
+				return symbol->st_value;
+			}
+		}
+	}
+	*error_val = -4;
+	freeAllAndClose(fd, section_header_string_table, symbol_table, string_table, program_header);
+	return 0;
+}
+
+Elf64_Shdr *getSectionHeader(int fd, Elf64_Ehdr *elf_header)
+{
+	Elf64_Shdr *section_header = malloc(elf_header->e_shentsize * elf_header->e_shnum);
+	lseek(fd, elf_header->e_shoff, SEEK_SET);
+	read(fd, section_header, elf_header->e_shentsize * elf_header->e_shnum);
+	return section_header;
+}
+
+int getIndex(Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table, char *section_name)
+{
+	for (int i = 0; i < elf_header->e_shnum; i++)
+	{
+		if (strcmp(section_header_string_table + section_header[i].sh_name, section_name) == 0)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+char *getSymbolTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table)
+{
+	int symtab_index = getIndex(section_header, elf_header, section_header_string_table, ".symtab");
 	Elf64_Shdr symbol_table_header = section_header[symtab_index];
 	char *symbol_table = (char *)malloc(symbol_table_header.sh_size);
 	lseek(fd, symbol_table_header.sh_offset, SEEK_SET);
 	read(fd, symbol_table, symbol_table_header.sh_size);
+	return symbol_table;
+}
 
-	int strtab_index = getIndex(section_header_string_table, SHT_STRTAB, elf_header.e_shnum);
-	Elf64_Shdr string_table_header = section_header[strtab_index];
-	char *string_table = (char *)malloc(string_table_header.sh_size);
-	lseek(fd, string_table_header.sh_offset, SEEK_SET);
-	read(fd, string_table, string_table_header.sh_size);
+char *getStringTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table)
+{
+	int symtab_index = getIndex(section_header, elf_header, section_header_string_table, ".strtab");
+	Elf64_Shdr symbol_table_header = section_header[symtab_index];
+	char *symbol_table = (char *)malloc(symbol_table_header.sh_size);
+	lseek(fd, symbol_table_header.sh_offset, SEEK_SET);
+	read(fd, symbol_table, symbol_table_header.sh_size);
+	return symbol_table;
+}
 
-	int num_of_symbols = symbol_table_header.sh_size / symbol_table_header.sh_entsize;
+char *getSectionHeaderStringTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header)
+{
+	Elf64_Shdr header_section_header_string_table = section_header[elf_header->e_shstrndx];
+	char *section_header_string_table = (char *)malloc(header_section_header_string_table.sh_size);
+	lseek(fd, header_section_header_string_table.sh_offset, SEEK_SET);
+	read(fd, section_header_string_table, header_section_header_string_table.sh_size);
+	return section_header_string_table;
+}
 
+Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *symbol_table, char *symbol_name)
+{
+	int num_of_symbols = symbol_table_header->sh_size / symbol_table_header->sh_entsize;
+	Elf64_Sym *ret_symbol = NULL;
 	for (int i = 0; i < num_of_symbols; ++i)
 	{
-		Elf64_Sym *symbol = (Elf64_Sym *)(symbol_table + i * symbol_table_header.sh_entsize);
+		Elf64_Sym *symbol = (Elf64_Sym *)(symbol_table + i * symbol_table_header->sh_entsize);
 		char *symbol_name = string_table + symbol->st_name;
 		if (strcmp(symbol_name, symbol_name) == 0)
 		{
-			if (ELF64_ST_BIND(symbol->st_info) == STB_GLOBAL)
+			if (symbol->st_info == STB_GLOBAL)
 			{
-				free(section_header_string_table);
-				free(string_table);
-				free(symbol_table);
-				close(fd);
-				*error_val = 0;
-				return symbol->st_value;
+				return symbol;
 			}
-			else
-			{
-				free(section_header_string_table);
-				free(string_table);
-				free(symbol_table);
-				close(fd);
-				*error_val = -2;
-				return 1;
-			}
+			ret_symbol = symbol;
 		}
 	}
-
-	*error_val = -1;
-	free(section_header_string_table);
-	free(string_table);
-	free(symbol_table);
-	close(fd);
-	return 1;
+	return ret_symbol;
 }
 
-int getIndex(Elf64_Shdr *section_header_string_table, int type, int num_of_sections)
+Elf64_Phdr *getProgramHeader(int fd, Elf64_Ehdr *elf_header)
 {
-	int i = 0;
-	while (section_header_string_table[i].sh_type != type && i < num_of_sections)
-	{
-		i++;
-	}
-	return i;
+	Elf64_Phdr *program_header = malloc(elf_header->e_phentsize * elf_header->e_phnum);
+	lseek(fd, elf_header->e_phoff, SEEK_SET);
+	read(fd, program_header, elf_header->e_phentsize * elf_header->e_phnum);
+	return program_header;
+}
+
+void freeAllAndClose(int fd, char *section_header_string_table, char *symbol_table, char *string_table, Elf64_Phdr *program_header)
+{
+	free(section_header_string_table);
+	free(symbol_table);
+	free(string_table);
+	free(program_header);
+	close(fd);
 }
 
 int main(int argc, char *const argv[])
 {
+	//! to remove!
+	char **args = malloc(sizeof(char *) * 3);
+	args[0] = malloc(sizeof(char) * 100);
+	args[1] = malloc(sizeof(char) * 100);
+	args[2] = malloc(sizeof(char) * 100);
+	strcpy(args[1], "hash");
+	strcpy(args[2], "verySecretProgram");
+
+	//!
 	int err = 0;
-	unsigned long addr = find_symbol(argv[1], argv[2], &err);
+	//! change to argv
+	unsigned long addr = find_symbol(args[1], args[2], &err);
 
 	if (addr > 0)
-		printf("%s will be loaded to 0x%lx\n", argv[1], addr);
+		printf("%s will be loaded to 0x%lx\n", args[1], addr);
 	else if (err == -2)
-		printf("%s is not a global symbol! :(\n", argv[1]);
+		printf("%s is not a global symbol! :(\n", args[1]);
 	else if (err == -1)
-		printf("%s not found!\n", argv[1]);
+		printf("%s not found!\n", args[1]);
 	else if (err == -3)
-		printf("%s not an executable! :(\n", argv[2]);
+		printf("%s not an executable! :(\n", args[2]);
 	else if (err == -4)
-		printf("%s is a global symbol, but will come from a shared library\n", argv[1]);
+		printf("%s is a global symbol, but will come from a shared library\n", args[1]);
+
+	//! to remove!
+	free(args[0]);
+	free(args[1]);
+	free(args[2]);
+	free(args);
+	//!
 	return 0;
 }

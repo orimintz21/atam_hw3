@@ -1,0 +1,1 @@
+/usr/bin/gcc -g -rdynamic CMakeFiles/myprogram.dir/hw3_part1.c.o -o myprogram 

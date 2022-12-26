@@ -1,0 +1,3 @@
+/home/orimintz21/atam/hw3/hw3_students_file/build/CMakeFiles/myprogram.dir
+/home/orimintz21/atam/hw3/hw3_students_file/build/CMakeFiles/edit_cache.dir
+/home/orimintz21/atam/hw3/hw3_students_file/build/CMakeFiles/rebuild_cache.dir
