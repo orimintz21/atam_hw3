@@ -59,14 +59,14 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 #define STB_GLOBAL 1
 
 int getIndex(Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table, char *section_name);
-Elf64_Shdr *getSectionHeader(int fd, Elf64_Ehdr *elf_header);
-char *getSymbolTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table);
-char *getStringTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table);
-char *getSectionHeaderStringTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header);
-Elf64_Phdr *getProgramHeader(int fd, Elf64_Ehdr *elf_header);
+Elf64_Shdr *getSectionHeader(FILE *fp, Elf64_Ehdr *elf_header);
+char *getSymbolTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table);
+char *getStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table);
+char *getSectionHeaderStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header);
+Elf64_Phdr *getProgramHeader(FILE *fp, Elf64_Ehdr *elf_header);
 Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *symbol_table, char *symbol_name);
 
-void freeAllAndClose(int fd, char *section_header_string_table, char *symbol_table, char *string_table, Elf64_Phdr *program_header);
+void freeAllAndClose(FILE *fp, char *section_header_string_table, char *symbol_table, char *string_table, Elf64_Phdr *program_header);
 
 unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val)
 {
@@ -75,29 +75,30 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 		*error_val = -1;
 		return 0;
 	}
-	// printf("symbol_name: %s, exe_file_name: %s\n", symbol_name, exe_file_name);
-	int fd = open(exe_file_name, O_RDONLY);
-	if (fd < 0)
+	FILE *fp = fopen(exe_file_name, "r");
+	if (fp == NULL)
 	{
 		*error_val = -3;
 		return 0;
 	}
+
 	Elf64_Ehdr elf_header;
-	read(fd, &elf_header, sizeof(elf_header));
+	fread(&elf_header, sizeof(Elf64_Ehdr), 1, fp);
+
 	if (elf_header.e_type != ET_EXEC)
 	{
-		close(fd);
+		fclose(fp);
 		*error_val = -3;
 		return 0;
 	}
 
-	Elf64_Shdr *section_header = getSectionHeader(fd, &elf_header);
+	Elf64_Shdr *section_header = getSectionHeader(fp, &elf_header);
 
-	char *section_header_string_table = getSectionHeaderStringTable(fd, section_header, &elf_header);
+	char *section_header_string_table = getSectionHeaderStringTable(fp, section_header, &elf_header);
 
-	char *symbol_table = getSymbolTable(fd, section_header, &elf_header, section_header_string_table);
+	char *symbol_table = getSymbolTable(fp, section_header, &elf_header, section_header_string_table);
 
-	char *string_table = getStringTable(fd, section_header, &elf_header, section_header_string_table);
+	char *string_table = getStringTable(fp, section_header, &elf_header, section_header_string_table);
 
 	int symtab_index = getIndex(section_header, &elf_header, section_header_string_table, ".symtab");
 	Elf64_Shdr symbol_table_header = section_header[symtab_index];
@@ -106,16 +107,16 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 	if (!symbol)
 	{
 		*error_val = -1;
-		freeAllAndClose(fd, section_header_string_table, symbol_table, string_table, NULL);
+		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, NULL);
 		return 0;
 	}
 	if (symbol->st_shndx != STB_GLOBAL)
 	{
 		*error_val = -2;
-		freeAllAndClose(fd, section_header_string_table, symbol_table, string_table, NULL);
+		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, NULL);
 		return 0;
 	}
-	Elf64_Phdr *program_header = getProgramHeader(fd, &elf_header);
+	Elf64_Phdr *program_header = getProgramHeader(fp, &elf_header);
 	for (int i = 0; i < elf_header.e_phnum; i++)
 	{
 		if (program_header[i].p_flags == SHF_EXECINSTR)
@@ -123,21 +124,21 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 			if (symbol->st_value >= program_header[i].p_vaddr && symbol->st_value < program_header[i].p_vaddr + program_header[i].p_memsz)
 			{
 				*error_val = 1;
-				freeAllAndClose(fd, section_header_string_table, symbol_table, string_table, program_header);
+				freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, program_header);
 				return symbol->st_value;
 			}
 		}
 	}
 	*error_val = -4;
-	freeAllAndClose(fd, section_header_string_table, symbol_table, string_table, program_header);
+	freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, program_header);
 	return 0;
 }
 
-Elf64_Shdr *getSectionHeader(int fd, Elf64_Ehdr *elf_header)
+Elf64_Shdr *getSectionHeader(FILE *fp, Elf64_Ehdr *elf_header)
 {
 	Elf64_Shdr *section_header = malloc(elf_header->e_shentsize * elf_header->e_shnum);
-	lseek(fd, elf_header->e_shoff, SEEK_SET);
-	read(fd, section_header, elf_header->e_shentsize * elf_header->e_shnum);
+	fseek(fp, elf_header->e_shoff, SEEK_SET);
+	fread(section_header, elf_header->e_shentsize, elf_header->e_shnum, fp);
 	return section_header;
 }
 
@@ -152,32 +153,32 @@ int getIndex(Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_h
 	}
 	return -1;
 }
-char *getSymbolTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table)
+char *getSymbolTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table)
 {
 	int symtab_index = getIndex(section_header, elf_header, section_header_string_table, ".symtab");
 	Elf64_Shdr symbol_table_header = section_header[symtab_index];
 	char *symbol_table = (char *)malloc(symbol_table_header.sh_size);
-	lseek(fd, symbol_table_header.sh_offset, SEEK_SET);
-	read(fd, symbol_table, symbol_table_header.sh_size);
+	fseek(fp, symbol_table_header.sh_offset, SEEK_SET);
+	fread(symbol_table, symbol_table_header.sh_size, 1, fp);
 	return symbol_table;
 }
 
-char *getStringTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table)
+char *getStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table)
 {
 	int symtab_index = getIndex(section_header, elf_header, section_header_string_table, ".strtab");
 	Elf64_Shdr symbol_table_header = section_header[symtab_index];
 	char *symbol_table = (char *)malloc(symbol_table_header.sh_size);
-	lseek(fd, symbol_table_header.sh_offset, SEEK_SET);
-	read(fd, symbol_table, symbol_table_header.sh_size);
+	fseek(fp, symbol_table_header.sh_offset, SEEK_SET);
+	fread(symbol_table, symbol_table_header.sh_size, 1, fp);
 	return symbol_table;
 }
 
-char *getSectionHeaderStringTable(int fd, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header)
+char *getSectionHeaderStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header)
 {
 	Elf64_Shdr header_section_header_string_table = section_header[elf_header->e_shstrndx];
 	char *section_header_string_table = (char *)malloc(header_section_header_string_table.sh_size);
-	lseek(fd, header_section_header_string_table.sh_offset, SEEK_SET);
-	read(fd, section_header_string_table, header_section_header_string_table.sh_size);
+	fseek(fp, header_section_header_string_table.sh_offset, SEEK_SET);
+	fread(section_header_string_table, header_section_header_string_table.sh_size, 1, fp);
 	return section_header_string_table;
 }
 
@@ -201,21 +202,21 @@ Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *
 	return ret_symbol;
 }
 
-Elf64_Phdr *getProgramHeader(int fd, Elf64_Ehdr *elf_header)
+Elf64_Phdr *getProgramHeader(FILE *fp, Elf64_Ehdr *elf_header)
 {
 	Elf64_Phdr *program_header = malloc(elf_header->e_phentsize * elf_header->e_phnum);
-	lseek(fd, elf_header->e_phoff, SEEK_SET);
-	read(fd, program_header, elf_header->e_phentsize * elf_header->e_phnum);
+	fseek(fp, elf_header->e_phoff, SEEK_SET);
+	fread(program_header, elf_header->e_phentsize, elf_header->e_phnum, fp);
 	return program_header;
 }
 
-void freeAllAndClose(int fd, char *section_header_string_table, char *symbol_table, char *string_table, Elf64_Phdr *program_header)
+void freeAllAndClose(FILE *fp, char *section_header_string_table, char *symbol_table, char *string_table, Elf64_Phdr *program_header)
 {
 	free(section_header_string_table);
 	free(symbol_table);
 	free(string_table);
 	free(program_header);
-	close(fd);
+	fclose(fp);
 }
 
 int main(int argc, char *const argv[])
