@@ -84,7 +84,6 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 
 	Elf64_Ehdr elf_header;
 	fread(&elf_header, sizeof(Elf64_Ehdr), 1, fp);
-
 	if (elf_header.e_type != ET_EXEC)
 	{
 		fclose(fp);
@@ -92,8 +91,10 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 		return 0;
 	}
 
-	Elf64_Shdr *section_header = getSectionHeader(fp, &elf_header);
-
+	// Elf64_Shdr *section_header = getSectionHeader(fp, &elf_header);
+	Elf64_Shdr section_header[elf_header.e_shentsize * elf_header.e_shnum];
+	fseek(fp, elf_header.e_shoff, SEEK_SET);
+	fread(section_header, elf_header.e_shentsize, elf_header.e_shnum, fp);
 	char *section_header_string_table = getSectionHeaderStringTable(fp, section_header, &elf_header);
 
 	char *symbol_table = getSymbolTable(fp, section_header, &elf_header, section_header_string_table);
@@ -110,7 +111,7 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, NULL);
 		return 0;
 	}
-	if (symbol->st_shndx != STB_GLOBAL)
+	if (ELF64_ST_BIND(symbol->st_shndx) != STB_GLOBAL)
 	{
 		*error_val = -2;
 		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, NULL);
@@ -119,13 +120,18 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 	Elf64_Phdr *program_header = getProgramHeader(fp, &elf_header);
 	for (int i = 0; i < elf_header.e_phnum; i++)
 	{
-		if (program_header[i].p_flags == SHF_EXECINSTR)
+		Elf64_Phdr program_header_entry = program_header[i];
+		if (symbol->st_value >= program_header_entry.p_vaddr && symbol->st_value < program_header_entry.p_vaddr + program_header_entry.p_memsz)
 		{
-			if (symbol->st_value >= program_header[i].p_vaddr && symbol->st_value < program_header[i].p_vaddr + program_header[i].p_memsz)
+			if (program_header_entry.p_flags == SHF_EXECINSTR)
 			{
 				*error_val = 1;
 				freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, program_header);
 				return symbol->st_value;
+			}
+			else
+			{
+				break;
 			}
 		}
 	}
@@ -182,7 +188,7 @@ char *getSectionHeaderStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Eh
 	return section_header_string_table;
 }
 
-Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *symbol_table, char *symbol_name)
+Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *symbol_table, char *symbol_input)
 {
 	int num_of_symbols = symbol_table_header->sh_size / symbol_table_header->sh_entsize;
 	Elf64_Sym *ret_symbol = NULL;
@@ -190,7 +196,7 @@ Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *
 	{
 		Elf64_Sym *symbol = (Elf64_Sym *)(symbol_table + i * symbol_table_header->sh_entsize);
 		char *symbol_name = string_table + symbol->st_name;
-		if (strcmp(symbol_name, symbol_name) == 0)
+		if (strcmp(symbol_name, symbol_input) == 0)
 		{
 			if (symbol->st_info == STB_GLOBAL)
 			{
