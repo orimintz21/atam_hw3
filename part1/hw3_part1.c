@@ -20,7 +20,6 @@
 #define ET_EXEC 2 // Executable file
 #define ET_DYN 3  // Shared object file
 #define ET_CORE 4 // Core file
-#define SHF_EXECINSTR 0x4
 
 /* symbol_name		- The symbol (maybe function) we need to search for.
  * exe_file_name	- The file where we search the symbol in.
@@ -57,9 +56,10 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 #define SHT_SYMTAB 2
 #define PT_LOAD 1
 #define STB_GLOBAL 1
+#define SHF_EXECINSTR 0x4
+#define PF_X 0x1
 
 int getIndex(Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table, char *section_name);
-Elf64_Shdr *getSectionHeader(FILE *fp, Elf64_Ehdr *elf_header);
 char *getSymbolTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table);
 char *getStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table);
 char *getSectionHeaderStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header);
@@ -91,10 +91,10 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 		return 0;
 	}
 
-	// Elf64_Shdr *section_header = getSectionHeader(fp, &elf_header);
 	Elf64_Shdr section_header[elf_header.e_shentsize * elf_header.e_shnum];
 	fseek(fp, elf_header.e_shoff, SEEK_SET);
 	fread(section_header, elf_header.e_shentsize, elf_header.e_shnum, fp);
+
 	char *section_header_string_table = getSectionHeaderStringTable(fp, section_header, &elf_header);
 
 	char *symbol_table = getSymbolTable(fp, section_header, &elf_header, section_header_string_table);
@@ -111,7 +111,7 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, NULL);
 		return 0;
 	}
-	if (ELF64_ST_BIND(symbol->st_shndx) != STB_GLOBAL)
+	if (ELF64_ST_BIND(symbol->st_info) != STB_GLOBAL)
 	{
 		*error_val = -2;
 		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, NULL);
@@ -123,7 +123,7 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 		Elf64_Phdr program_header_entry = program_header[i];
 		if (symbol->st_value >= program_header_entry.p_vaddr && symbol->st_value < program_header_entry.p_vaddr + program_header_entry.p_memsz)
 		{
-			if (program_header_entry.p_flags == SHF_EXECINSTR)
+			if (program_header_entry.p_flags & PF_X)
 			{
 				*error_val = 1;
 				freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, program_header);
@@ -138,14 +138,6 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 	*error_val = -4;
 	freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, program_header);
 	return 0;
-}
-
-Elf64_Shdr *getSectionHeader(FILE *fp, Elf64_Ehdr *elf_header)
-{
-	Elf64_Shdr *section_header = malloc(elf_header->e_shentsize * elf_header->e_shnum);
-	fseek(fp, elf_header->e_shoff, SEEK_SET);
-	fread(section_header, elf_header->e_shentsize, elf_header->e_shnum, fp);
-	return section_header;
 }
 
 int getIndex(Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table, char *section_name)
@@ -171,12 +163,12 @@ char *getSymbolTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_heade
 
 char *getStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table)
 {
-	int symtab_index = getIndex(section_header, elf_header, section_header_string_table, ".strtab");
-	Elf64_Shdr symbol_table_header = section_header[symtab_index];
-	char *symbol_table = (char *)malloc(symbol_table_header.sh_size);
-	fseek(fp, symbol_table_header.sh_offset, SEEK_SET);
-	fread(symbol_table, symbol_table_header.sh_size, 1, fp);
-	return symbol_table;
+	int strtab_index = getIndex(section_header, elf_header, section_header_string_table, ".strtab");
+	Elf64_Shdr string_table_header = section_header[strtab_index];
+	char *string_table = (char *)malloc(string_table_header.sh_size);
+	fseek(fp, string_table_header.sh_offset, SEEK_SET);
+	fread(string_table, string_table_header.sh_size, 1, fp);
+	return string_table;
 }
 
 char *getSectionHeaderStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Ehdr *elf_header)
@@ -198,7 +190,7 @@ Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *
 		char *symbol_name = string_table + symbol->st_name;
 		if (strcmp(symbol_name, symbol_input) == 0)
 		{
-			if (symbol->st_info == STB_GLOBAL)
+			if (ELF64_ST_BIND(symbol->st_info) == STB_GLOBAL)
 			{
 				return symbol;
 			}
@@ -227,35 +219,19 @@ void freeAllAndClose(FILE *fp, char *section_header_string_table, char *symbol_t
 
 int main(int argc, char *const argv[])
 {
-	//! to remove!
-	char **args = malloc(sizeof(char *) * 3);
-	args[0] = malloc(sizeof(char) * 100);
-	args[1] = malloc(sizeof(char) * 100);
-	args[2] = malloc(sizeof(char) * 100);
-	strcpy(args[1], "hash");
-	strcpy(args[2], "verySecretProgram");
-
-	//!
 	int err = 0;
-	//! change to argv
-	unsigned long addr = find_symbol(args[1], args[2], &err);
+
+	unsigned long addr = find_symbol(argv[1], argv[2], &err);
 
 	if (addr > 0)
-		printf("%s will be loaded to 0x%lx\n", args[1], addr);
+		printf("%s will be loaded to 0x%lx\n", argv[1], addr);
 	else if (err == -2)
-		printf("%s is not a global symbol! :(\n", args[1]);
+		printf("%s is not a global symbol! :(\n", argv[1]);
 	else if (err == -1)
-		printf("%s not found!\n", args[1]);
+		printf("%s not found!\n", argv[1]);
 	else if (err == -3)
-		printf("%s not an executable! :(\n", args[2]);
+		printf("%s not an executable! :(\n", argv[2]);
 	else if (err == -4)
-		printf("%s is a global symbol, but will come from a shared library\n", args[1]);
-
-	//! to remove!
-	free(args[0]);
-	free(args[1]);
-	free(args[2]);
-	free(args);
-	//!
+		printf("%s is a global symbol, but will come from a shared library\n", argv[1]);
 	return 0;
 }
