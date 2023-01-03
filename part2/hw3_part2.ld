@@ -1,36 +1,33 @@
-/* TODO: complete the script */
-
 ENTRY(_hw3_dance)
+
+PHDRS
+{
+	text PT_LOAD FLAGS ( 2 | 1 ) ;
+	data PT_LOAD FLAGS ( 2 ) ;
+	rodata PT_LOAD FLAGS ( 4 | 1 ) ;
+}
+
+EXTERN (greens blacks)
+
 SECTIONS
 {
-  . = 0x20000;
-  .data : 
+  .data 0x20000 : 
     {
 	    *(.data)
-    } AT (ADDR(.data) | PAGE_WRITEONLY)
+    } :data
   .bss :
     {
 	    *(.bss)
-    } AT (ADDR(.bss) | PAGE_WRITEONLY)
-
-  //TODO: add other sections
-  . = 0x400000;
-  .text: 
+    } :data
+  
+  .text 0x400000  : 
   {
     *(.text)
-  } AT (ADDR(.text) | PAGE_EXECUTE_WRITECOPY)
+  } :text
 
-  . = 0x90000000;
-  .rodata : 
+  .rodata 0x90000000 : 
   {
 	*(.rodata)
-  } AT (ADDR(.rodata) | PAGE_EXECUTE_READ) 
-
-  .symtab : 
-  {
-    *(.symtab)
-    greens (Ndx=UND)
-    blacks (Ndx=UND)
-  }
+  } :rodata
 
 }
