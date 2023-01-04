@@ -30,28 +30,6 @@
  * 			- If -4: The symbol was found, it is global, but it is not defined in the executable.
  * return value		- The address which the symbol_name will be loaded to, if the symbol was found and is global.
  */
-
-// TODO: psodo
-/*
-unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val){
-	elf header <- beginning of file
-	if elf_header.type != executable or header is null:
-		error not executable, return;
-	all_sections_array = elf_header + sh_offset ("All sections array now contains all sections")
-	all_sections_array[elf_header.section_string_table] -> section_string_table ("This table contains the strings of all sections")
-	Find string table ("The table which contains the strings of all symbols"):
-		Iterate over all sections array:
-			For each section, find the offset name
-			section name = section_string_table + offset name
-			if section name == strtab then this the section, return it
-	Find symbol table: the same as above, just compare to symtab
-	Iterate over symbol table entries:
-		For each symbol, find the symbol name offset
-		actual name = string_table + offset
-		if actual_name == *symbol_name:
-			Check st_info field of the symbol
-			if st_info is global, return the symbol offset
-*/
 #define SHT_STRTAB 3
 #define SHT_SYMTAB 2
 #define PT_LOAD 1
