@@ -44,7 +44,7 @@ char *getSectionHeaderStringTable(FILE *fp, Elf64_Shdr *section_header, Elf64_Eh
 Elf64_Phdr *getProgramHeader(FILE *fp, Elf64_Ehdr *elf_header);
 Elf64_Sym *getSymbol(Elf64_Shdr *symbol_table_header, char *string_table, char *symbol_table, char *symbol_name);
 
-void freeAllAndClose(FILE *fp, char *section_header_string_table, char *symbol_table, char *string_table, Elf64_Phdr *program_header);
+void freeAllAndClose(FILE *fp, char *section_header_string_table, char *symbol_table, char *string_table);
 
 unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val)
 {
@@ -86,36 +86,24 @@ unsigned long find_symbol(char *symbol_name, char *exe_file_name, int *error_val
 	if (!symbol)
 	{
 		*error_val = -1;
-		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, NULL);
+		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table);
 		return 0;
 	}
 	if (ELF64_ST_BIND(symbol->st_info) != STB_GLOBAL)
 	{
 		*error_val = -2;
-		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, NULL);
+		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table);
 		return 0;
 	}
-	Elf64_Phdr *program_header = getProgramHeader(fp, &elf_header);
-	for (int i = 0; i < elf_header.e_phnum; i++)
+	if (symbol->st_shndx == SHN_UNDEF)
 	{
-		Elf64_Phdr program_header_entry = program_header[i];
-		if (symbol->st_value >= program_header_entry.p_vaddr && symbol->st_value < program_header_entry.p_vaddr + program_header_entry.p_memsz)
-		{
-			if (program_header_entry.p_flags & PF_X)
-			{
-				*error_val = 1;
-				freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, program_header);
-				return symbol->st_value;
-			}
-			else
-			{
-				break;
-			}
-		}
+		*error_val = -4;
+		freeAllAndClose(fp, section_header_string_table, symbol_table, string_table);
+		return 0;
 	}
-	*error_val = -4;
-	freeAllAndClose(fp, section_header_string_table, symbol_table, string_table, program_header);
-	return 0;
+	*error_val = 1;
+	freeAllAndClose(fp, section_header_string_table, symbol_table, string_table);
+	return symbol->st_value;
 }
 
 int getIndex(Elf64_Shdr *section_header, Elf64_Ehdr *elf_header, char *section_header_string_table, char *section_name)
@@ -186,12 +174,11 @@ Elf64_Phdr *getProgramHeader(FILE *fp, Elf64_Ehdr *elf_header)
 	return program_header;
 }
 
-void freeAllAndClose(FILE *fp, char *section_header_string_table, char *symbol_table, char *string_table, Elf64_Phdr *program_header)
+void freeAllAndClose(FILE *fp, char *section_header_string_table, char *symbol_table, char *string_table)
 {
 	free(section_header_string_table);
 	free(symbol_table);
 	free(string_table);
-	free(program_header);
 	fclose(fp);
 }
 
